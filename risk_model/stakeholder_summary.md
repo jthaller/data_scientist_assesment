@@ -24,41 +24,56 @@ The model looks at signals we already know about the user at the moment they req
 | Debt load | Advance amount relative to their typical paycheck | Borrowing 20% of a paycheck is safer than 90% |
 | Job tenure | Days since hire date | Longer tenure → more stable employment |
 | Liquidity | Available bank balance at time of request | Cash on hand is a direct safety buffer |
-| Platform loyalty | Time as a Clair member, number of pay cycles used | Longer track record = more confidence |
+| Platform loyalty | Time as a Clair member, number of pay cycles completed | Longer track record = more confidence |
+| Account age | How many pay cycles of history we have on record | New users with limited history are treated more cautiously |
 
 The model combines these signals and outputs a **default probability score** between 0 and 1. A score of 0.05 means "5% chance this user defaults." A score of 0.60 means "60% chance."
+
+**An important step: probability calibration.** Raw model scores need to be translated into meaningful probabilities before they can drive decisions. Think of it like a weather forecast — "70% chance of rain" is only useful if, historically, it actually rains 70% of the time when that forecast is issued. We apply the same logic to our model scores, ensuring that a score of 0.10 genuinely reflects a 10% default risk. Without this step, the scores can be misleading — and in our initial testing, using uncalibrated scores would have produced a threshold that let through over 90% of actual defaults undetected.
 
 ---
 
 ## How lending decisions are made
 
-We set a **decision threshold** — a cutoff probability above which we decline the request. For example, with a threshold of 0.35:
+We set a **decision threshold** — a cutoff probability above which we decline the request. With our calibrated model and current cost assumptions, that threshold is **0.16**:
 
-- Score < 0.35 → **Approve**
-- Score ≥ 0.35 → **Decline**
+- Calibrated score < 0.16 → **Approve**
+- Calibrated score ≥ 0.16 → **Decline**
 
-The threshold is not arbitrary. We calibrated it by weighing two types of mistakes:
+The threshold is not arbitrary. We chose it by weighing two types of mistakes:
 
 - **Approving a user who defaults** → we lose the full advance amount
 - **Declining a user who would have repaid** → we lose the fee and damage the user relationship
 
-We assumed a missed default costs roughly **5× more** than a declined good user. The threshold was chosen to minimise total expected cost under this assumption. If the business changes its view of the cost ratio, the threshold can be adjusted with a single parameter — no retraining needed.
+We assumed a missed default costs roughly **5× more** than a declined good user. The threshold was chosen to minimise total expected cost under this assumption.
+
+**The threshold is a business lever, not a permanent setting.** If the business wants to be more aggressive in growth, we raise the threshold slightly (approve more users, accept a marginally higher loss rate). If default rates are climbing, we lower it. Either way, no retraining is needed — we just move the cutoff.
+
+---
+
+## How we validated the model
+
+Before trusting the model's scores, we ran two important checks:
+
+**1. Time-based validation.** We trained the model on older loans and tested it on the most recent loans — simulating exactly what will happen in production, where we always predict on requests more recent than our training data. The model performed just as well on the newer loans (AUC 0.76) as it did in cross-validation (AUC 0.74), giving us confidence that it generalises to future requests and isn't just memorising the past.
+
+**2. Calibration check.** We verified that the model's probability scores actually match real-world outcomes. A model that predicts "20% default risk" for a group of users should see roughly 20% of them default. We confirmed this holds, and applied a calibration correction where needed.
 
 ---
 
 ## Expected business benefits
 
 **1. Reduced default losses**  
-By catching high-risk requests before they're approved, we avoid a meaningful share of defaults. The model's accuracy (ROC AUC) comfortably exceeds random chance, meaning it reliably identifies risky users better than a coin flip — or a simple rule like "decline anyone with a late payment."
+By catching high-risk requests before they're approved, we avoid a meaningful share of defaults. The model reliably identifies risky users better than any single rule — "decline anyone with a late payment" would be both too broad (hurting good users) and too narrow (missing first-time defaulters with no late payment history yet).
 
 **2. Better user experience for low-risk users**  
-Because the model is more precise than a blanket rule, fewer good users are unfairly declined. Users with clean histories get faster, frictionless approvals.
+Because the model is more precise than a blanket rule, fewer good users are unfairly declined. Users with clean histories and stable income get faster, frictionless approvals.
 
 **3. Consistent, auditable decisions**  
 Every decision is backed by a score and a clear rationale. This makes the process easier to audit, explain to regulators, and improve over time.
 
 **4. Scalability**  
-The model runs in milliseconds on any new advance request. It requires no human review for the majority of decisions.
+The model runs in milliseconds on any new advance request and requires no human review for the vast majority of decisions.
 
 ---
 
@@ -68,29 +83,33 @@ For approved users, instead of always granting the full requested amount, we can
 
 > **Safe Amount = Requested Amount × Repayment Confidence × Liquidity Factor**
 
-- **Repayment Confidence** = 1 minus the default probability. A user with a 5% default risk has a 95% repayment confidence.
-- **Liquidity Factor** = how much available cash the user has relative to their typical paycheck. If their bank account already covers a full paycheck, this factor is 1 (no reduction). If they're nearly empty, it scales down the offer.
+- **Repayment Confidence** = 1 minus the *calibrated* default probability. Because we've calibrated our scores, this number is meaningful — a user at 10% default risk genuinely has a 90% repayment confidence.
+- **Liquidity Factor** = how much available cash the user has relative to their typical paycheck. If their bank account already covers a full paycheck, the factor is 1 (no reduction). If they're cash-poor, it scales the offer down.
 
 **Example:**
 - User requests $200
-- Model gives them a 10% default probability → Repayment confidence = 0.90
-- Available balance is half their typical paycheck → Liquidity factor = 0.5
+- Calibrated model gives them a 10% default probability → Repayment confidence = 0.90
+- Available balance is half their typical paycheck → Liquidity factor = 0.50
 - Safe amount = $200 × 0.90 × 0.50 = **$90**
 
-This approach lets us say "yes" to more users (even borderline ones) while limiting our exposure by offering a smaller amount. It turns a binary approve/decline into a graduated, risk-proportional product.
+**What we observed in the data:** Among users the model approves, those who eventually default received an average safe-amount offer of $46, compared to $49 for users who repay successfully. This confirms the formula is working as intended — the model is already nudging lower offers toward higher-risk users, even among those it doesn't outright decline.
+
+This approach lets us say "yes" to more users (including borderline cases) while limiting our exposure by offering a smaller amount. It turns a binary approve/decline into a graduated, risk-proportional product.
 
 ---
 
 ## What this model is not
 
-- It is not a credit score. It's specific to Clair wage advance repayment behavior.
-- It is not final. Model performance should be monitored monthly and retrained as user behavior and economic conditions evolve.
-- It does not replace human judgment for edge cases. Complex situations (disputes, fraud signals) should still involve manual review.
+- **Not a credit score.** It is specific to Clair wage advance repayment behavior, using signals from our own platform that traditional credit bureaus don't have.
+- **Not final.** Model performance should be monitored regularly and the model retrained as user behavior, economic conditions, and our product evolve.
+- **Not a replacement for human judgment** on edge cases. Complex situations (disputes, suspected fraud, account anomalies) should still involve manual review.
+- **Not exempt from fair lending review.** Before using this model in production decisions, it should be audited to ensure it does not produce disparate outcomes for any groups protected under applicable consumer credit law.
 
 ---
 
 ## Next steps
 
-1. **Shadow mode deployment**: Run the model alongside existing decisions for 4–8 weeks to validate predictions against real outcomes before going live.
-2. **Monitoring dashboard**: Track model accuracy, approval rate, and default rate weekly to catch drift early.
-3. **Feedback loop**: As new repayment outcomes come in, retrain the model quarterly to keep it current.
+1. **Shadow mode deployment**: Run the model alongside existing decisions for 4–8 weeks, scoring every request without acting on the score. Compare predictions against real outcomes before the model affects any lending decision.
+2. **Monitoring dashboard**: Track model accuracy, approval rate, and default rate on a weekly basis, with alerts if any metric moves outside expected bounds.
+3. **Feedback loop**: As new repayment outcomes come in, retrain the model on a regular cadence to keep it current with evolving user behavior.
+4. **Fair lending audit**: Assess whether any model features produce disparate impact across demographic groups before production deployment.
