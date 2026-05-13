@@ -1,0 +1,19 @@
+[project]
+name = "clair-risk-model"
+version = "0.1.0"
+description = "Default risk model for Clair wage advance eligibility"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "pandas",
+    "scikit-learn",
+    "lightgbm",
+    "matplotlib",
+    "seaborn",
+    "sqlalchemy",
+    "psycopg2-binary",
+    "python-dotenv",
+    "jupyter",
+    "ipykernel",
+    "nbconvert",
+]
