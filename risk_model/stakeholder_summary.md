@@ -35,19 +35,33 @@ The model combines these signals and outputs a **default probability score** bet
 
 ## How lending decisions are made
 
-We set a **decision threshold** — a cutoff probability above which we decline the request. With our calibrated model and current cost assumptions, that threshold is **0.16**:
+We set a **decision threshold** — a cutoff probability above which we decline the request.
 
-- Calibrated score < 0.16 → **Approve**
-- Calibrated score ≥ 0.16 → **Decline**
+The threshold is chosen by weighing two types of mistakes:
 
-The threshold is not arbitrary. We chose it by weighing two types of mistakes:
+- **Approving a user who defaults** — we lose the full advance amount (~$158 on average)
+- **Declining a user who would have repaid** — we lose not just the $4.99 instant-transfer fee from this transaction, but potentially the user's entire future relationship with Clair if they churn
 
-- **Approving a user who defaults** → we lose the full advance amount
-- **Declining a user who would have repaid** → we lose the fee and damage the user relationship
+The true cost of a false decline is:
 
-We assumed a missed default costs roughly **5× more** than a declined good user. The threshold was chosen to minimise total expected cost under this assumption.
+> **Cost of a false decline = lost fee + (probability the user churns x their remaining lifetime value)**
 
-**The threshold is a business lever, not a permanent setting.** If the business wants to be more aggressive in growth, we raise the threshold slightly (approve more users, accept a marginally higher loss rate). If default rates are climbing, we lower it. Either way, no retraining is needed — we just move the cutoff.
+**How much is a customer relationship worth?** We grounded this in actual usage data: the median user takes 4 advances over ~6 months, generating roughly $15 in total fee revenue. Power users (top 10%) take 10+ advances (~$37). Using these data-grounded estimates:
+
+If 30% of declined users churn, and their remaining lifetime value is ~$50 (a generous estimate based on power users), the cost of incorrectly declining a good user is roughly $4 (lost fee) + $15 (churn risk) = **~$19**. This makes the cost ratio roughly **8:1** (one default = 8 false declines), producing a threshold of approximately **0.10** and a decline rate of ~6%.
+
+The threshold is sensitive to churn assumptions:
+
+| Churn assumption | Cost of false decline | Threshold | Decline rate | Net ROI |
+|---|---|---|---|---|
+| Low (10% churn, $15 LTV) | ~$5 | 0.03 | ~41% | ~$260K |
+| **High (30% churn, $50 LTV)** | **~$19** | **0.10** | **~6%** | **~$62K** |
+
+We recommend starting with the **conservative** high-churn scenario (threshold 0.10, ~6% decline rate) to balance loss prevention with user experience. Even at this conservative setting, the model delivers ~$62K in net ROI.
+
+**Why is the decline rate relatively high?** Because Clair's per-transaction revenue ($4.99 fee, and only on instant advances) is small relative to the cost of a single default (~$158). One default wipes out the fee revenue from 8–30+ successful transactions. The model is simply reflecting this economic reality: when the downside is 30x the upside, it pays to be cautious.
+
+**The threshold is a business lever, not a permanent setting.** If the business wants to be more aggressive in growth, we raise the threshold (approve more users, accept a higher loss rate). If default rates are climbing, we lower it. Either way, no retraining is needed — we just move the cutoff. The two most important inputs to calibrate this lever are the **actual churn rate** for declined users and the **average remaining customer lifetime value**, both of which can be measured during the shadow deployment period.
 
 ---
 
@@ -64,7 +78,9 @@ Before trusting the model's scores, we ran two important checks:
 ## Expected business benefits
 
 **1. Reduced default losses — with concrete ROI**  
-At the current threshold, the model catches approximately 435 defaults out of every ~120,000 advance requests. At an average advance of ~$158, that represents **~$69,000 in prevented losses**. The cost of declining the ~1,470 good users who are incorrectly flagged is approximately **~$11,000 in lost fee revenue**, yielding a **net benefit of ~$58,000** — a roughly 6:1 return.
+At the conservative threshold (0.10, based on high-churn assumptions), the model catches approximately 1,100 defaults out of every ~120,000 advance requests. At an average advance of ~$158, that represents **~$173,000 in prevented losses**. The cost of incorrectly declining ~5,900 good users — including both lost fees and expected churn — is approximately **~$111,000**, yielding a **net benefit of ~$62,000**.
+
+If actual churn is lower than our conservative 30% assumption, the net benefit increases substantially — potentially to $160K+ at moderate churn levels. The exact numbers should be refined once we measure actual churn during shadow mode.
 
 The model identifies risky users better than any single rule — "decline anyone with a late payment" would be both too broad (hurting good users) and too narrow (missing first-time defaulters with no late payment history yet).
 
@@ -79,11 +95,11 @@ The model runs in milliseconds on any new advance request and requires no human 
 
 ---
 
-## Bonus: How much should we offer? (Safe Amount Estimation)
+## How much should we offer? (Safe Amount Estimation)
 
 For approved users, instead of always granting the full requested amount, we can offer a **personalised safe amount**:
 
-> **Safe Amount = Requested Amount × Repayment Confidence × Liquidity Factor**
+> **Safe Amount = Requested Amount x Repayment Confidence x Liquidity Factor**
 
 - **Repayment Confidence** = 1 minus the *calibrated* default probability. Because we've calibrated our scores, this number is meaningful — a user at 10% default risk genuinely has a 90% repayment confidence.
 - **Liquidity Factor** = how much available cash the user has relative to their typical paycheck. If their bank account already covers a full paycheck, the factor is 1 (no reduction). If they're cash-poor, it scales the offer down.
@@ -92,7 +108,7 @@ For approved users, instead of always granting the full requested amount, we can
 - User requests $200
 - Calibrated model gives them a 10% default probability → Repayment confidence = 0.90
 - Available balance is half their typical paycheck → Liquidity factor = 0.50
-- Safe amount = $200 × 0.90 × 0.50 = **$90**
+- Safe amount = $200 x 0.90 x 0.50 = **$90**
 
 **What we observed in the data:** Among approved users, average safe amounts are similar across outcomes — but the formula's value is at the tails. The riskiest approved users (high default probability, low bank balance) receive meaningfully smaller offers than the safest users (low default probability, healthy balance). This graduated approach limits our exposure on borderline approvals where the binary approve/decline decision is least certain.
 
@@ -112,6 +128,7 @@ This approach lets us say "yes" to more users (including borderline cases) while
 ## Next steps
 
 1. **Shadow mode deployment**: Run the model alongside existing decisions for 4–8 weeks, scoring every request without acting on the score. Compare predictions against real outcomes before the model affects any lending decision.
-2. **Monitoring dashboard**: Track model accuracy, approval rate, and default rate on a weekly basis, with alerts if any metric moves outside expected bounds.
-3. **Feedback loop**: As new repayment outcomes come in, retrain the model on a regular cadence to keep it current with evolving user behavior.
-4. **Fair lending audit**: Assess whether any model features produce disparate impact across demographic groups before production deployment.
+2. **Measure churn and LTV**: During shadow mode, track retention rates for declined vs. approved users and calculate remaining customer lifetime value. These two numbers determine the optimal decision threshold.
+3. **Monitoring dashboard**: Track model accuracy, approval rate, and default rate on a weekly basis, with alerts if any metric moves outside expected bounds.
+4. **Feedback loop**: As new repayment outcomes come in, retrain the model on a regular cadence to keep it current with evolving user behavior.
+5. **Fair lending audit**: Assess whether any model features produce disparate impact across demographic groups before production deployment.
