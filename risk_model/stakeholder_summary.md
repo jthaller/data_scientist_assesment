@@ -63,8 +63,10 @@ Before trusting the model's scores, we ran two important checks:
 
 ## Expected business benefits
 
-**1. Reduced default losses**  
-By catching high-risk requests before they're approved, we avoid a meaningful share of defaults. The model reliably identifies risky users better than any single rule — "decline anyone with a late payment" would be both too broad (hurting good users) and too narrow (missing first-time defaulters with no late payment history yet).
+**1. Reduced default losses — with concrete ROI**  
+At the current threshold, the model catches approximately 435 defaults out of every ~120,000 advance requests. At an average advance of ~$158, that represents **~$69,000 in prevented losses**. The cost of declining the ~1,470 good users who are incorrectly flagged is approximately **~$11,000 in lost fee revenue**, yielding a **net benefit of ~$58,000** — a roughly 6:1 return.
+
+The model identifies risky users better than any single rule — "decline anyone with a late payment" would be both too broad (hurting good users) and too narrow (missing first-time defaulters with no late payment history yet).
 
 **2. Better user experience for low-risk users**  
 Because the model is more precise than a blanket rule, fewer good users are unfairly declined. Users with clean histories and stable income get faster, frictionless approvals.
@@ -92,7 +94,7 @@ For approved users, instead of always granting the full requested amount, we can
 - Available balance is half their typical paycheck → Liquidity factor = 0.50
 - Safe amount = $200 × 0.90 × 0.50 = **$90**
 
-**What we observed in the data:** Among users the model approves, those who eventually default received an average safe-amount offer of $46, compared to $49 for users who repay successfully. This confirms the formula is working as intended — the model is already nudging lower offers toward higher-risk users, even among those it doesn't outright decline.
+**What we observed in the data:** Among approved users, average safe amounts are similar across outcomes — but the formula's value is at the tails. The riskiest approved users (high default probability, low bank balance) receive meaningfully smaller offers than the safest users (low default probability, healthy balance). This graduated approach limits our exposure on borderline approvals where the binary approve/decline decision is least certain.
 
 This approach lets us say "yes" to more users (including borderline cases) while limiting our exposure by offering a smaller amount. It turns a binary approve/decline into a graduated, risk-proportional product.
 
