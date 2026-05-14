@@ -41,7 +41,7 @@ Rather than a binary approve/deny, we use a **three-tier decision framework**:
 | **Capped approval** | Borderline users | Approve at a reduced cap (e.g. $50) |
 | **Deny** | High-risk users | Decline with specific reasons |
 
-The thresholds (currently P < 3% for full approval, P ≥ 15% for denial) are hand-picked starting points — the cap threshold roughly aligns with the overall base rate (3.5%), while the deny threshold is set high enough that very few users are denied outright. *In production, a grid search over threshold pairs would optimize these to maximize net benefit (future fee revenue minus default losses minus churn cost) given measured churn and LTV data.* 
+The thresholds (currently P < 3% for full approval, P ≥ 15% for denial) are hand-picked starting points — the cap threshold roughly aligns with the overall base rate (3.5%), while the deny threshold is set high enough that very few users are denied outright. *In production, a grid search over threshold pairs would optimize these to maximize net benefit (future fee revenue minus default losses minus churn cost) given measured churn and LTV data. Understanding actual churn rates and per-user LTV is critical for optimizing these thresholds.*
 
 **Why tiers instead of approve/deny?** Denying a financially stressed worker outright carries high churn risk — they're unlikely to come back. But offering them $50 instead of $200 keeps them on the platform, limits our exposure to at most $50 if they default, and gives them a chance to build repayment history toward full approval. The economics are dramatically better than a binary approach: in our modeling, the tiered approach produces **~$73K net benefit** vs. **negative ROI** for binary approve/deny under realistic churn assumptions.
 
