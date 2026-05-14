@@ -41,15 +41,15 @@ Rather than a binary approve/deny, we use a **three-tier decision framework**:
 | **Capped approval** | Borderline users | Approve at a reduced cap (e.g. $50) |
 | **Deny** | High-risk users | Decline with specific reasons |
 
-**Why tiers instead of approve/deny?** Denying a financially stressed worker outright carries high churn risk — they're unlikely to come back. But offering them $50 instead of $200 keeps them on the platform, limits our exposure to at most $50 if they default, and gives them a chance to build repayment history toward full approval. The economics are dramatically better: in our modeling, the tiered approach produces **~$96K net benefit** vs. **negative ROI** for binary approve/deny under realistic churn assumptions.
+**Why tiers instead of approve/deny?** Denying a financially stressed worker outright carries high churn risk — they're unlikely to come back. But offering them $50 instead of $200 keeps them on the platform, limits our exposure to at most $50 if they default, and gives them a chance to build repayment history toward full approval. The economics are dramatically better: in our modeling, the tiered approach produces **~$73K net benefit** vs. **negative ROI** for binary approve/deny under realistic churn assumptions.
 
 | Scenario | Binary net ROI | Tiered net ROI | Improvement |
 |---|---|---|---|
-| Low churn (15% deny / 3% cap) | -$4K | $158K | +$162K |
-| **Mid churn (30% deny / 5% cap)** | **-$106K** | **$96K** | **+$202K** |
-| High churn (50% deny / 10% cap) | -$192K | -$87K | +$106K |
+| Low churn (15% deny / 3% cap) | -$161K | $117K | +$278K |
+| **Mid churn (30% deny / 5% cap)** | **-$168K** | **$73K** | **+$241K** |
+| High churn (50% deny / 10% cap) | -$194K | -$126K | +$69K |
 
-Under the recommended mid-churn scenario: ~42% of users get full approval, ~57% get a capped offer, and only ~1% are denied outright.
+Under the recommended mid-churn scenario: ~58% of users get full approval, ~41% get a capped offer, and only ~2% are denied outright.
 
 **Both thresholds are business levers.** Raise the cap threshold to send more users toward full approval; raise the deny threshold to convert more denials into capped offers. No retraining needed — just move the cutoffs. The key inputs to calibrate are the **actual churn rates** for capped vs. denied users, measurable during shadow deployment.
 
@@ -66,10 +66,10 @@ We tested the model three ways: (1) ensuring users with multiple loans are never
 ## Expected business benefits
 
 **1. Better economics through tiered decisions**  
-The tiered framework produces ~$96K net benefit per ~120K requests under mid-churn assumptions — a $202K improvement over binary approve/deny. The key driver: capping borderline users at $50 instead of denying them preserves fee revenue and customer relationships while limiting default exposure.
+The tiered framework produces ~$73K net benefit per ~120K requests under mid-churn assumptions — a $241K improvement over binary approve/deny. The key driver: capping borderline users at $50 instead of denying them preserves fee revenue and customer relationships while limiting default exposure.
 
 **2. Near-zero denial rate**  
-Only ~1% of users are denied under the recommended scenario, vs. ~10%+ under binary. Users who would have been denied now receive a capped offer — a better experience that still protects the business.
+Only ~2% of users are denied under the recommended scenario, vs. ~10%+ under binary. Users who would have been denied now receive a capped offer — a better experience that still protects the business.
 
 **3. Natural onboarding ramp**  
 Capped users who repay build history toward full approval, creating a self-reinforcing cycle: good behavior → higher limit → more engagement → more fee revenue.
