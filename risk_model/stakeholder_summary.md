@@ -41,7 +41,7 @@ Rather than a binary approve/deny, we use a **three-tier decision framework**:
 | **Capped approval** | Borderline users | Approve at a reduced cap (e.g. $50) |
 | **Deny** | High-risk users | Decline with specific reasons |
 
-The thresholds (currently P < 3% for full approval, P ≥ 15% for denial) are hand-picked starting points — the cap threshold roughly aligns with the overall base rate (3.5%), while the deny threshold is set high enough that very few users are denied outright. *In production, a grid search over threshold pairs would optimize these to maximize net benefit (future fee revenue minus default losses minus churn cost) given measured churn and LTV data. Understanding actual churn rates and per-user LTV is critical for optimizing these thresholds.*
+The thresholds (currently P < 3% for full approval, P ≥ 15% for denial) are hand-picked starting points — the cap threshold roughly aligns with the overall base rate (3.5%), while the deny threshold is set high enough that very few users are denied outright. *In production, a grid search over threshold pairs would optimize these to maximize net benefit (fee revenue minus default losses minus churn cost). This requires two sequential validation phases: (1) shadow scoring — run the model on every live request without acting on it to validate prediction accuracy against real outcomes; (2) controlled rollout — assign a small percentage of borderline users to receive capped offers (with compliance and fair lending review) to measure actual churn and retention differences. Understanding actual churn rates and per-user LTV is critical for optimizing these thresholds.*
 
 **Why tiers instead of approve/deny?** Denying a financially stressed worker outright carries high churn risk — they're unlikely to come back. But offering them $50 instead of $200 keeps them on the platform, limits our exposure to at most $50 if they default, and gives them a chance to build repayment history toward full approval. The economics are dramatically better than a binary approach: in our modeling, the tiered approach produces **~$73K net benefit** vs. **negative ROI** for binary approve/deny under realistic churn assumptions.
 
@@ -56,7 +56,7 @@ Under the recommended mid-churn scenario: ~58% of users get full approval, ~41% 
 **Three business levers drive every decision.**
  (1) The risk model itself — scores improve as we retrain on new repayment data. 
  (2) Churn sensitivity — the gap between churn rates for denied vs. capped users determines how aggressively to offer reduced amounts instead of denials. 
- (3) Lifetime value (LTV) estimates — higher LTV makes churn costlier, shifting thresholds toward approval. Both thresholds (cap and deny) can be adjusted without retraining; the key unknowns to measure during shadow deployment are actual churn rates and per-user LTV.
+ (3) Lifetime value (LTV) estimates — higher LTV makes churn costlier, shifting thresholds toward approval. Both thresholds (cap and deny) can be adjusted without retraining; the key unknowns to measure during a controlled rollout are actual churn rates and per-user LTV.
 
 **What happens when a user is denied?** If wage advances are classified as credit, regulations (ECOA/Reg B) require that we tell declined users the specific reasons — for example, "your advance amount was high relative to your recent paychecks." The model supports this: it produces a ranked list of the top factors behind each individual decision. Beyond compliance, this transparency gives users a clear path back — their score updates with every new paycheck and on-time repayment.
 
@@ -71,7 +71,7 @@ We tested the model three ways: (1) ensuring users with multiple loans are never
 ## Expected business benefits
 
 **1. Better economics through tiered decisions**  
-The tiered framework produces ~$73K net benefit per ~120K requests under mid-churn assumptions — a $241K improvement over binary approve/deny. The key driver: capping borderline users at $50 instead of denying them preserves fee revenue and customer relationships while limiting default exposure.
+The tiered framework produces positive net ROI under low- and mid-churn assumptions (see scenario table above). The key driver: capping borderline users at $50 instead of denying them preserves fee revenue and customer relationships while limiting default exposure.
 
 **2. Near-zero denial rate**  
 Only ~2% of users are denied outright. The remaining borderline users (~41%) receive a capped $50 offer instead of the full amount — a better experience that still protects the business.
@@ -86,8 +86,8 @@ Every decision is backed by a score and a clear rationale — easier to audit, e
 
 ## Next steps
 
-1. **Shadow mode + fair lending audit** (parallel, 4–8 weeks): Score every request without acting on it; simultaneously audit for disparate impact across demographic groups. Both must pass before the model affects any lending decision.
-2. **Measure churn rates**: Track churn for capped vs. denied vs. approved users — the gap between cap-churn and deny-churn is the entire economic justification for the tiered approach.
+1. **Shadow scoring + fair lending audit** (parallel, 4–8 weeks): Score every request without acting on it to validate prediction accuracy; simultaneously audit for disparate impact across demographic groups. Both must pass before the model affects any lending decision.
+2. **Controlled rollout to measure churn**: After shadow validation, assign a small % of borderline users to capped offers (with compliance review) to measure actual churn and retention differences — the gap between cap-churn and deny-churn is the entire economic justification for the tiered approach.
 3. **Test cap amount sensitivity**: $50 is a starting point, but user response to different cap levels ($25/$50/$75) likely varies by risk tier. Compliance-aware A/B testing would reveal how cap amount affects churn, default rates, and satisfaction — the single highest-leverage experiment for optimizing this framework.
 4. **Monitoring dashboard**: Weekly accuracy, approval rate, and default rate tracking with drift alerts.
 5. **Feedback loop**: Retrain on a regular cadence as new repayment outcomes come in.
