@@ -10,7 +10,6 @@
 When a Clair user requests a wage advance, we face a decision: approve or decline. Approving users who won't repay creates a direct financial loss. Declining users who would repay costs us a good customer relationship and fee revenue.
 
 Today, that decision may rely on simple rules. This model gives us a data-driven score for every request so we can make smarter, more consistent decisions at scale.
-
 ---
 
 ## How the model works (in plain English)
@@ -41,7 +40,7 @@ Rather than a binary approve/deny, we use a **three-tier decision framework**:
 | **Capped approval** | Borderline users | Approve at a reduced cap (e.g. $50) |
 | **Deny** | High-risk users | Decline with specific reasons |
 
-**Why tiers instead of approve/deny?** Denying a financially stressed worker outright carries high churn risk — they're unlikely to come back. But offering them $50 instead of $200 keeps them on the platform, limits our exposure to at most $50 if they default, and gives them a chance to build repayment history toward full approval. The economics are dramatically better: in our modeling, the tiered approach produces **~$73K net benefit** vs. **negative ROI** for binary approve/deny under realistic churn assumptions.
+**Why tiers instead of approve/deny?** Denying a financially stressed worker outright carries high churn risk — they're unlikely to come back. But offering them $50 instead of $200 keeps them on the platform, limits our exposure to at most $50 if they default, and gives them a chance to build repayment history toward full approval. The economics are dramatically better than a binary approach: in our modeling, the tiered approach produces **~$73K net benefit** vs. **negative ROI** for binary approve/deny under realistic churn assumptions.
 
 | Scenario | Binary net ROI | Tiered net ROI | Improvement |
 |---|---|---|---|
@@ -51,7 +50,7 @@ Rather than a binary approve/deny, we use a **three-tier decision framework**:
 
 Under the recommended mid-churn scenario: ~58% of users get full approval, ~41% get a capped offer, and only ~2% are denied outright.
 
-**Both thresholds are business levers.** Raise the cap threshold to send more users toward full approval; raise the deny threshold to convert more denials into capped offers. No retraining needed — just move the cutoffs. The key inputs to calibrate are the **actual churn rates** for capped vs. denied users, measurable during shadow deployment.
+**Three business levers drive every decision.** (1) The **risk model** itself — scores improve as we retrain on new repayment data. (2) **Churn sensitivity** — the gap between churn rates for denied vs. capped users determines how aggressively to offer reduced amounts instead of denials. (3) **Lifetime value (LTV)** estimates — higher LTV makes churn costlier, shifting thresholds toward approval. Both thresholds (cap and deny) can be adjusted without retraining; the key unknowns to measure during shadow deployment are actual churn rates and per-user LTV.
 
 **What happens when a user is denied?** If wage advances are classified as credit, regulations (ECOA/Reg B) require that we tell declined users the specific reasons — for example, "your advance amount was high relative to your recent paychecks." The model supports this: it produces a ranked list of the top factors behind each individual decision. Beyond compliance, this transparency gives users a clear path back — their score updates with every new paycheck and on-time repayment.
 
