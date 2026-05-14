@@ -41,40 +41,40 @@ Rather than a binary approve/deny, we use a **three-tier decision framework**:
 | **Capped approval** | Borderline users | Approve at a reduced cap (e.g. $50) |
 | **Deny** | High-risk users | Decline with specific reasons |
 
-The thresholds (currently P < 3% for full approval, P ≥ 15% for denial) are hand-picked starting points — the cap threshold roughly aligns with the overall base rate (3.5%), while the deny threshold is set high enough that very few users are denied outright. *In production, a grid search over threshold pairs would optimize these to maximize net benefit (fee revenue minus default losses minus churn cost). This requires two sequential validation phases: (1) shadow scoring — run the model on every live request without acting on it to validate prediction accuracy against real outcomes; (2) controlled rollout — assign a small percentage of borderline users to receive capped offers (with compliance and fair lending review) to measure actual churn and retention differences. Understanding actual churn rates and per-user LTV is critical for optimizing these thresholds.*
+The thresholds (currently P < 3% for full approval, P ≥ 15% for denial) are hand-picked starting points — the cap threshold roughly aligns with the overall base rate (3.5%), while the deny threshold is set high enough that very few users are denied outright. *In production, both thresholds would be optimized using measured churn rates and per-user LTV from a controlled rollout (see Next Steps).*
 
-**Why tiers instead of approve/deny?** Denying a financially stressed worker outright carries high churn risk — they're unlikely to come back. But offering them $50 instead of $200 keeps them on the platform, limits our exposure to at most $50 if they default, and gives them a chance to build repayment history toward full approval. The economics are dramatically better than a binary approach: in our modeling, the tiered approach produces **~$73K net benefit** vs. **negative ROI** for binary approve/deny under realistic churn assumptions.
+**Why tiers instead of approve/deny?** Denying a financially stressed worker outright carries high churn risk — they're unlikely to come back. But offering them $50 instead of $200 keeps them on the platform, limits our exposure to at most $50 if they default, and gives them a chance to build repayment history toward full approval. The economics are dramatically better than a binary approach: in our modeling, the tiered approach produces **~$73K net benefit** vs. **negative net benefit** for binary approve/deny under realistic churn assumptions.
 
-| Scenario | Binary net ROI | Tiered net ROI | Improvement |
+| Scenario | Binary net benefit | Tiered net benefit | Improvement |
 |---|---|---|---|
 | Low churn (15% if denied, 3% if capped) | -$161K | $117K | +$278K |
 | **Mid churn (30% if denied, 5% if capped)** | **-$168K** | **$73K** | **+$241K** |
 | High churn (50% if denied, 10% if capped) | -$194K | -$126K | +$69K |
 
-Under the recommended mid-churn scenario: ~58% of users get full approval, ~41% get a capped offer, and only ~2% are denied outright.
+Under the recommended mid-churn scenario: ~58% of users get full approval, ~41% get a capped offer, and under 2% are denied outright.
 
 **Three business levers drive every decision.**
  (1) The risk model itself — scores improve as we retrain on new repayment data. 
  (2) Churn sensitivity — the gap between churn rates for denied vs. capped users determines how aggressively to offer reduced amounts instead of denials. 
  (3) Lifetime value (LTV) estimates — higher LTV makes churn costlier, shifting thresholds toward approval. Both thresholds (cap and deny) can be adjusted without retraining; the key unknowns to measure during a controlled rollout are actual churn rates and per-user LTV.
 
-**What happens when a user is denied?** If wage advances are classified as credit, regulations (ECOA/Reg B) require that we tell declined users the specific reasons — for example, "your advance amount was high relative to your recent paychecks." The model supports this: it produces a ranked list of the top factors behind each individual decision. Beyond compliance, this transparency gives users a clear path back — their score updates with every new paycheck and on-time repayment.
+**What happens when a user is denied?** Depending on how wage advances are classified under lending regulations, ECOA/Reg B may require that we tell declined users the specific reasons — for example, "your advance amount was high relative to your recent paychecks." The model supports this: it produces a ranked list of the top factors behind each individual decision. Beyond compliance, this transparency gives users a clear path back — their score updates with every new paycheck and on-time repayment.
 
 ---
 
 ## How we validated the model
 
-We tested the model three ways: (1) ensuring users with multiple loans are never split across training and test sets, so accuracy reflects performance on genuinely new users; (2) training on older loans and testing on the most recent — the model performed equally well, confirming it generalises forward in time; (3) verifying that predicted probabilities match actual default rates, so the scores are trustworthy enough to drive dollar-value decisions.
+We tested the model three ways: (1) ensuring users with multiple loans are never split across training and test sets, so accuracy reflects performance on genuinely new users; (2) training on older loans and testing on the most recent — the model performed comparably, confirming it generalizes forward in time; (3) verifying that predicted probabilities match actual default rates, so the scores are trustworthy enough to drive dollar-value decisions.
 
 ---
 
 ## Expected business benefits
 
 **1. Better economics through tiered decisions**  
-The tiered framework produces positive net ROI under low- and mid-churn assumptions (see scenario table above). The key driver: capping borderline users at $50 instead of denying them preserves fee revenue and customer relationships while limiting default exposure.
+The tiered framework produces positive net benefit under low- and mid-churn assumptions (see scenario table above). The key driver: capping borderline users at $50 instead of denying them preserves fee revenue and customer relationships while limiting default exposure.
 
 **2. Near-zero denial rate**  
-Only ~2% of users are denied outright. The remaining borderline users (~41%) receive a capped $50 offer instead of the full amount — a better experience that still protects the business.
+Under 2% of users are denied outright. The remaining borderline users (~41%) receive a capped $50 offer instead of the full amount — a better experience that still protects the business.
 
 **3. Natural onboarding ramp**  
 Capped users who repay build history toward full approval, creating a self-reinforcing cycle: good behavior → higher limit → more engagement → more fee revenue.
