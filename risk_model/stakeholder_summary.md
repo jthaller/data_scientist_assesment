@@ -10,6 +10,7 @@
 When a Clair user requests a wage advance, we face a decision: approve or decline. Approving users who won't repay creates a direct financial loss. Declining users who would repay costs us a good customer relationship and fee revenue.
 
 Today, that decision may rely on simple rules. This model gives us a data-driven score for every request so we can make smarter, more consistent decisions at scale.
+
 ---
 
 ## How the model works (in plain English)
@@ -50,7 +51,10 @@ Rather than a binary approve/deny, we use a **three-tier decision framework**:
 
 Under the recommended mid-churn scenario: ~58% of users get full approval, ~41% get a capped offer, and only ~2% are denied outright.
 
-**Three business levers drive every decision.** (1) The **risk model** itself — scores improve as we retrain on new repayment data. (2) **Churn sensitivity** — the gap between churn rates for denied vs. capped users determines how aggressively to offer reduced amounts instead of denials. (3) **Lifetime value (LTV)** estimates — higher LTV makes churn costlier, shifting thresholds toward approval. Both thresholds (cap and deny) can be adjusted without retraining; the key unknowns to measure during shadow deployment are actual churn rates and per-user LTV.
+**Three business levers drive every decision.**
+ (1) The risk model itself — scores improve as we retrain on new repayment data. 
+ (2) Churn sensitivity — the gap between churn rates for denied vs. capped users determines how aggressively to offer reduced amounts instead of denials. 
+ (3) Lifetime value (LTV) estimates — higher LTV makes churn costlier, shifting thresholds toward approval. Both thresholds (cap and deny) can be adjusted without retraining; the key unknowns to measure during shadow deployment are actual churn rates and per-user LTV.
 
 **What happens when a user is denied?** If wage advances are classified as credit, regulations (ECOA/Reg B) require that we tell declined users the specific reasons — for example, "your advance amount was high relative to your recent paychecks." The model supports this: it produces a ranked list of the top factors behind each individual decision. Beyond compliance, this transparency gives users a clear path back — their score updates with every new paycheck and on-time repayment.
 
@@ -68,7 +72,7 @@ We tested the model three ways: (1) ensuring users with multiple loans are never
 The tiered framework produces ~$73K net benefit per ~120K requests under mid-churn assumptions — a $241K improvement over binary approve/deny. The key driver: capping borderline users at $50 instead of denying them preserves fee revenue and customer relationships while limiting default exposure.
 
 **2. Near-zero denial rate**  
-Only ~2% of users are denied under the recommended scenario, vs. ~10%+ under binary. Users who would have been denied now receive a capped offer — a better experience that still protects the business.
+Only ~2% of users are denied outright. The remaining borderline users (~41%) receive a capped $50 offer instead of the full amount — a better experience that still protects the business.
 
 **3. Natural onboarding ramp**  
 Capped users who repay build history toward full approval, creating a self-reinforcing cycle: good behavior → higher limit → more engagement → more fee revenue.
